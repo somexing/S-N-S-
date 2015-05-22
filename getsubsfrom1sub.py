@@ -53,6 +53,7 @@ import sys, re, Queue, time,os
 sys.path.append("../mymodule")
 import func
 import mt
+from lxml import etree
 
 printmode = True
 MAX_TRY_TIMES  = 2
@@ -61,34 +62,19 @@ MAX_TRY_TIMES  = 2
 func.SHOW_LOG = False
 
 
-first_sub_id = '89384484' # #default, 开始id     322782894'  #
+focus_sub_id_list = [] #'89384484' # #default, 开始id     322782894'  #
 deep_level =  1 #爬取深度
 focus_value = 3 #关注度超过多少，才会进一步挖掘
 
  
-mt.MAX_THREADS_NUM = 200 #线程池大小
+mt.MAX_THREADS_NUM = 600 #线程池大小
 
 fans_file_name = 'fans.dat'
 subs_file_name = 'subs.dat'
-
+focus_subid_file_name = "focus_subs.dat"
 
 # get  first_sub_id,  deep_levelm focus_value (only dig the sub which's focus value > this value)
-def read_arg() :   
-    global first_sub_id, deep_level, focus_value
-    if (len(sys.argv) > 1):
-       first_sub_id = sys.argv[1]      # video id        
-    else:
-       print("No indicate argument, By Default ")
-    
-    print("I will run first_sub_id %s" % first_sub_id)
 
-    if (len(sys.argv) > 2):
-       deep_level = int(sys.argv[2])            
-    print("I will dig %s level" %  deep_level)
-
-    if (len(sys.argv) > 3):
-       focus_value = int(sys.argv[3])
-    print("I will dig only focus value > %s" %  focus_value)
 
 def get_html_func(_url):
     resp = func.GetHttpContent ( _url )           
@@ -137,7 +123,22 @@ class SNS ():
       self.f_s_list =  f_s
       self.s_f_list =  s_f
       self.s_list = s
-       
+  def read_arg(self) :   
+    global focus_sub_id_list, deep_level, focus_value        
+    if (len(sys.argv) > 1):
+       first_sub_id = sys.argv[1]      # video id            
+       focus_sub_id_list.append(first_sub_id)
+       self.write_unique_idlist_to_file(focus_sub_id_list, focus_subid_file_name)
+       print("I will run first_sub_id %s" % first_sub_id)
+    else:
+       print("No indicate argument, By Default read from focus_history.dat ")
+       focus_sub_id_list = self.get_id_list_from_file(focus_subid_file_name)
+    if (len(sys.argv) > 2):
+       deep_level = int(sys.argv[2])            
+    print("I will dig %s level" %  deep_level)
+    if (len(sys.argv) > 3):
+       focus_value = int(sys.argv[3])
+    print("I will dig only focus value > %s" %  focus_value)       
       
   def get_fan_sub_first_url(self, fan_id):
       return  self.f_s_list[0] + str(fan_id) + self.f_s_list[1] 
@@ -149,16 +150,16 @@ class SNS ():
   def get_fan_sub_page(self, fan_id, page_num):
       return  self.f_s_list[0] + str(fan_id) + self.f_s_list[2] + str(page_num) + self.f_s_list[3] 
 
-  def get_sub_page_from_sub_url(self, fan_sub_url, page_num):  	    
-  	  idx = fan_sub_url.find(self.f_s_list[3])
-  	  new_url = fan_sub_url[0:idx-1] + str(page_num) + self.f_s_list[3] 
-  	  #print("get_sub_page_from_sub_url %s %s %s"%(fan_sub_url, page_num, new_url))
-  	  return new_url
+  def get_sub_page_from_sub_url(self, fan_sub_url, page_num):       
+      idx = fan_sub_url.find(self.f_s_list[3])
+      new_url = fan_sub_url[0:idx-1] + str(page_num) + self.f_s_list[3] 
+      #print("get_sub_page_from_sub_url %s %s %s"%(fan_sub_url, page_num, new_url))
+      return new_url
 
-  def get_fan_page_from_fan_url(self,  sub_fan_url, page_num):  	    
-  	  idx = sub_fan_url.find(self.s_f_list[3])
-  	  new_url = sub_fan_url[0:idx-1] + str(page_num) + self.s_f_list[3]   	  
-  	  return new_url
+  def get_fan_page_from_fan_url(self,  sub_fan_url, page_num):        
+      idx = sub_fan_url.find(self.s_f_list[3])
+      new_url = sub_fan_url[0:idx-1] + str(page_num) + self.s_f_list[3]       
+      return new_url
 
 
      
@@ -279,8 +280,8 @@ class SNS ():
     all_fan_url_list = []
     #get every sub's fan's url, get first page first step
     for sub_id  in all_sub_id_list :     
-    	  fan_url =  self.get_sub_fan_first_url(sub_id)
-    	  all_fan_url_list.append(fan_url) #first page
+        fan_url =  self.get_sub_fan_first_url(sub_id)
+        all_fan_url_list.append(fan_url) #first page
     first_page_result_queue = Queue.Queue() 
     mt_create_queue_flag = False
     mt.runMT("get_all_subs", get_html_func, all_fan_url_list, mt_create_queue_flag, first_page_result_queue)
@@ -295,12 +296,12 @@ class SNS ():
         self.store_id_to_dict(fan_id_list ,  fan_id_dict)   
         page_ttl = ttl_fans_num / max_num_per_page    # ttl_subs_num max is 999, per page max_num_per_page
         if (ttl_fans_num % max_num_per_page > 0) :
-        	page_ttl = page_ttl + 1       
+          page_ttl = page_ttl + 1       
         if page_ttl > 1 :# has more page 
-           for   pagenum  in range(2, page_ttl + 1):	#next page from 2 to page_ttl , more subs
-        	    other_url = self.get_fan_page_from_fan_url(fan_url, pagenum)
-        	    other_page_url_list.append( other_url )
-    #print("the number of other page of subs need to get  : %s "% (len(other_page_sub_url_list)))                            	
+           for   pagenum  in range(2, page_ttl + 1):  #next page from 2 to page_ttl , more subs
+              other_url = self.get_fan_page_from_fan_url(fan_url, pagenum)
+              other_page_url_list.append( other_url )
+    #print("the number of other page of subs need to get  : %s "% (len(other_page_sub_url_list)))                             
     mt.runMT("get_all_fans", get_tudou_json, other_page_url_list,
              False,  None,
              store_to_dict, fan_id_dict)     
@@ -339,8 +340,8 @@ class SNS ():
     
     all_fans_id_list = self.get_fans(sub_id)
     print("scrapy found %s fans from the sub id %s   "% (len(all_fans_id_list), sub_id))                    
-    self.write_unique_id_to_file(all_fans_id_list, fans_file_name)
-    self.write_unique_id_to_file(all_fans_id_list, sub_id + fans_file_name)
+    self.write_unique_idlist_to_file(all_fans_id_list, fans_file_name)
+    self.write_unique_idlist_to_file(all_fans_id_list, sub_id + fans_file_name)
     
         
     self.get_all_subs( all_fans_id_list, sub_id_dict)   
@@ -350,22 +351,51 @@ class SNS ():
     return sub_id_dict
     
  
+
      
   def write_sub_info(self, sub_id_dict, file_name):
     sub_id_focus_pair_list = sorted(sub_id_dict.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)    
-    fp = open(file_name ,'w')        
+   
+    all_sub_url_list = []    
     for  _pair in sub_id_focus_pair_list:
            sub_id = _pair[0]
-           focus_num = _pair[1]
-           info_url = self.getsubinfourl(sub_id)
-           fp.write('<a href = "' +info_url +  '" target="_blank">' +str(sub_id)+' </a>  ' + str(focus_num))
+           sub_url = self.getsubinfourl(sub_id)
+           all_sub_url_list.append(sub_url)
+    #get url's page
+    sub_page_result_queue = Queue.Queue() 
+    mt_create_queue_flag = False
+    mt.runMT("get_all_subs", get_html_func, all_sub_url_list, mt_create_queue_flag, sub_page_result_queue)
+    #for every sub's url , 
+
+    sub_url_name_dict = {}
+    id_name_xpath = '//*[@id="topTitle"]/h3'
+    while (not sub_page_result_queue.empty()):
+        _url , html  =   sub_page_result_queue.get()
+        tree = etree.HTML(html)
+        r_list =  tree.xpath(id_name_xpath)
+        #sub_url_name_dict[_url] = str(_url)
+        if len(r_list) > 0:    
+           id_name = r_list[0].text.strip() 
+          # print id_name
+           sub_url_name_dict[_url] = id_name
+
+    fp = open(file_name ,'a+') 
+    for  _pair in sub_id_focus_pair_list:
+           sub_id = _pair[0]
+           focus_num = _pair[1]          
+           sub_url = self.getsubinfourl(sub_id)
+           id_name = str(sub_id)
+           if  sub_url_name_dict.has_key(sub_url):
+             id_name = sub_url_name_dict[sub_url]
+           fp.write('<a href = "' +sub_url +  '" target="_blank">' + 
+                      (str(id_name.encode("GBK", 'ignore'))) +' </a>  ' + str(focus_num))
            fp.write('<br>')
     fp.close()   
     print("%s sub's url and focus value writed to %s!"%(len(sub_id_focus_pair_list),file_name ))
     return sub_id_focus_pair_list
 
   #read id from file named file_name，write id from id_list to file if unique
-  def write_unique_id_to_file(self, id_list, id_file_name):   
+  def write_unique_idlist_to_file(self, id_list, id_file_name):   
     fp = open(id_file_name,'a+')         
     id_lines = fp.readlines()
     fp.close()
@@ -414,13 +444,14 @@ class SNS ():
     return id_dict_compared
         
     
-  def deep_dig_sub(self):
+  def deep_dig_sub(self, first_sub_id):
+    
     sub_id_dict = {}
     last_dig_sub_id_list = []
     dig_sub_id_list = [first_sub_id] #only get one id from argv, use     
     for i in range(deep_level): #loop from 0 to  deep_level - 1
        this_level = i + 1
-       print("scrapy level %s "% (this_level))
+       print("scrapy sub id %s, level %s "% (first_sub_id, this_level))
        for sub_id in dig_sub_id_list:   # dig each sub id  ,get all sub to sub_id_dict
            self.get_sub_fan_sub(sub_id, sub_id_dict)                         
        
@@ -433,8 +464,8 @@ class SNS ():
        all_sub_html_name = "all_"+first_sub_id+"_"+str(this_level)+".htm"      
        sub_id_focus_pair_list = self.write_sub_info(sub_id_dict, all_sub_html_name ) # every level will record              
 
-       self.write_unique_id_to_file(sub_id_dict.keys(), subs_file_name)
-       self.write_unique_id_to_file(sub_id_dict.keys(), this_sub_file_name)
+       self.write_unique_idlist_to_file(sub_id_dict.keys(), subs_file_name)
+       self.write_unique_idlist_to_file(sub_id_dict.keys(), this_sub_file_name)
        
        last_dig_sub_id_list = last_dig_sub_id_list + dig_sub_id_list  # id has digged
        if (i  <   deep_level - 1) : #need dig again
@@ -444,7 +475,7 @@ class SNS ():
   def getnewsubfromallfans(self):
        #read all fans' ids from file
        all_fans_id_list = self.get_id_list_from_file(fans_file_name)
-       print("get %s fans id from the file named   %s "% (len(all_fans_id_list), fans_file_name))                          	   
+       print("get %s fans id from the file named   %s "% (len(all_fans_id_list), fans_file_name))                              
        
        #get every fan's sub list        
        new_all_sub_id_dict = {}
@@ -455,12 +486,12 @@ class SNS ():
        new_sub_html_name = "new_sub.htm"  
        self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
        #record new sub id
-       self.write_unique_id_to_file(sub_id_dict_compared.keys(), subs_file_name)
+       self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)
        
-  def getnewsubfromallsubs(self):  	
+  def getnewsubfromallsubs(self):   
        #get all subs' ids from file
        old_subs_id_list = self.get_id_list_from_file(subs_file_name)
-       print("get %s subs id from the file named   %s "% (len(old_subs_id_list), subs_file_name))                          	          
+       print("get %s subs id from the file named   %s "% (len(old_subs_id_list), subs_file_name))                                     
        
        #get every fan's fans list        
        new_all_fans_id_dict = {}
@@ -476,7 +507,7 @@ class SNS ():
        new_sub_html_name = "new_sub.htm"  
        self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
        #record new sub id
-       self.write_unique_id_to_file(sub_id_dict_compared.keys(), subs_file_name)      
+       self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)      
            
  
     
@@ -518,9 +549,11 @@ tudou_s_f= [td_s_f_pre, td_s_f_post, td_s_f_post_page_pre,  td_s_f_post_page_pos
         
 tudou_sns = SNS(tudou_f_s, tudou_s_f, tudou_s)
 
-read_arg()
- 
-tudou_sns.deep_dig_sub()
+
+
+tudou_sns.read_arg() 
+for each_focus_sub_id in focus_sub_id_list:
+   tudou_sns.deep_dig_sub(each_focus_sub_id)
 #tudou_sns.getnewsubfromallfans()
 #tudou_sns.getnewsubfromallsubs() #very slow!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
