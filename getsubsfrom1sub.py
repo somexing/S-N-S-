@@ -353,7 +353,7 @@ class SNS ():
  
 
      
-  def write_sub_info(self, sub_id_dict, file_name):
+  def write_sub_info(self, sub_id_dict, file_name, file_mode = 'w'):
     sub_id_focus_pair_list = sorted(sub_id_dict.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)    
    
     all_sub_url_list = []    
@@ -379,7 +379,7 @@ class SNS ():
           # print id_name
            sub_url_name_dict[_url] = id_name
 
-    fp = open(file_name ,'a+') 
+    fp = open(file_name ,file_mode) 
     for  _pair in sub_id_focus_pair_list:
            sub_id = _pair[0]
            focus_num = _pair[1]          
@@ -437,7 +437,8 @@ class SNS ():
     new_sub_id_list = new_sub_id_dict.keys()
     old_sub_id_list = self.get_id_list_from_file(old_file_name)
     id_dict_compared = {}
-   
+    
+    #print("new_sub_id_list : %s , old_sub_id_list : %s" %(len(new_sub_id_list),len(old_sub_id_list)))
     for the_id in new_sub_id_list :
       if str(the_id) not in old_sub_id_list :
          id_dict_compared[the_id] = new_sub_id_dict[the_id]    
@@ -455,17 +456,18 @@ class SNS ():
        for sub_id in dig_sub_id_list:   # dig each sub id  ,get all sub to sub_id_dict
            self.get_sub_fan_sub(sub_id, sub_id_dict)                         
        
-       this_sub_file_name = first_sub_id + subs_file_name       #?
+       
        sub_id_dict_compared = self.get_new_sub_dict_compared_file(sub_id_dict, subs_file_name)
        #new_sub_html_name = "new_"+first_sub_id+"_"+str(this_level)+".htm"  
        new_sub_html_name = "new_sub.htm"  
-       self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
+       self.write_sub_info(sub_id_dict_compared, new_sub_html_name, 'a+' ) 
        
        all_sub_html_name = "all_"+first_sub_id+"_"+str(this_level)+".htm"      
        sub_id_focus_pair_list = self.write_sub_info(sub_id_dict, all_sub_html_name ) # every level will record              
 
        self.write_unique_idlist_to_file(sub_id_dict.keys(), subs_file_name)
-       self.write_unique_idlist_to_file(sub_id_dict.keys(), this_sub_file_name)
+       this_sub_file_name = first_sub_id + subs_file_name       #?
+      # self.write_unique_idlist_to_file(sub_id_dict.keys(), this_sub_file_name)
        
        last_dig_sub_id_list = last_dig_sub_id_list + dig_sub_id_list  # id has digged
        if (i  <   deep_level - 1) : #need dig again
@@ -552,7 +554,11 @@ tudou_sns = SNS(tudou_f_s, tudou_s_f, tudou_s)
 
 
 tudou_sns.read_arg() 
+idx = 1
 for each_focus_sub_id in focus_sub_id_list:
+   print("################### deal No.%s  id %s. total %s id ##################" 
+         % ( idx, each_focus_sub_id, len(focus_sub_id_list)))
+   idx = idx + 1 
    tudou_sns.deep_dig_sub(each_focus_sub_id)
 #tudou_sns.getnewsubfromallfans()
 #tudou_sns.getnewsubfromallsubs() #very slow!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
