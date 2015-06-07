@@ -69,12 +69,12 @@ focus_value = 3 #关注度超过多少，才会进一步挖掘
  
 mt.MAX_THREADS_NUM = 600 #线程池大小
 
-fans_file_name = 'fans.txt'
-subs_file_name = 'subs.txt'
-focus_subid_file_name = "focus_subs.txt"
+fans_file_name = 'fans.dat'
+subs_file_name = 'subs.dat'
+focus_subid_file_name = "focus_subs.dat"
 
 TOP_N = 20
-topn_sub_file_name = 'topsub.txt'
+topn_sub_file_name = 'topsub.dat'
 
 # get  first_sub_id,  deep_levelm focus_value (only dig the sub which's focus value > this value)
 
@@ -134,7 +134,7 @@ class SNS ():
        self.write_unique_idlist_to_file(focus_sub_id_list, focus_subid_file_name)
        print("I will run first_sub_id %s" % first_sub_id)
     else:
-       print("No indicate argument, By Default read from %s "%focus_subid_file_name)
+       print("No indicate argument, By Default read from focus_history.dat ")
        focus_sub_id_list = self.get_id_list_from_file(focus_subid_file_name)
     if (len(sys.argv) > 2):
        deep_level = int(sys.argv[2])            
@@ -353,6 +353,16 @@ class SNS ():
     print("scrapy found %s subs from the fans of sub id %s "% (all_sub_id_counter, sub_id))                
     return sub_id_dict
     
+def write_TopN_sub_id(self, sub_id_dict, file_name, file_mode = 'w'):
+    sub_id_focus_pair_list = sorted(sub_id_dict.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)    
+
+    fp = open(file_name ,file_mode) 
+    for  _pair in sub_id_focus_pair_list:
+           sub_id = _pair[0]
+           fp.write(sub_id)
+    fp.close()   
+    print("%s top sub's url and focus value writed to %s!"%(len(sub_id_focus_pair_list),file_name ))
+    
  
 
      
@@ -447,17 +457,7 @@ class SNS ():
          id_dict_compared[the_id] = new_sub_id_dict[the_id]    
     return id_dict_compared
         
-  def write_TopN_sub_id(self, sub_id_dict, file_name, file_mode = 'w'):
-    sub_id_focus_pair_list = sorted(sub_id_dict.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)    
-
-    fp = open(file_name ,file_mode) 
-    for  _pair in sub_id_focus_pair_list:
-           sub_id = _pair[0]
-           fp.write(str(sub_id)+os.linesep)
-    fp.close()   
-    print("%s top sub's id writed to %s!"%(len(sub_id_focus_pair_list),file_name ))
     
-     
   def deep_dig_sub(self, first_sub_id):
     
     sub_id_dict = {}
@@ -478,6 +478,7 @@ class SNS ():
        all_sub_html_name = "all_"+first_sub_id+"_"+str(this_level)+".htm"      
        sub_id_focus_pair_list = self.write_sub_info(sub_id_dict, all_sub_html_name ) # every level will record              
 
+
        this_sub_file_name = first_sub_id + subs_file_name       #?
       # self.write_unique_idlist_to_file(sub_id_dict.keys(), this_sub_file_name)
        
@@ -487,7 +488,7 @@ class SNS ():
          dig_sub_id_list = list(set(focus_sub_id_list) - set(last_dig_sub_id_list)) # clean id  which has digged   
     
     self.write_unique_idlist_to_file(sub_id_dict.keys(), subs_file_name)
-    self.write_TopN_sub_id(sub_id_dict, topn_sub_file_name)     
+    self.write_TopN_sub_id(sub_id_dict, topn_sub_file_name)
 
   def getnewsubfromallfans(self):
        #read all fans' ids from file
@@ -504,32 +505,27 @@ class SNS ():
        self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
        #record new sub id
        self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)
-  
-  def getnewsubfromsubsfile(self, new_all_sub_id_dict):
-      subs_id_list_in_file = self.get_id_list_from_file(subs_file_name)
-      print("get %s subs id from the file named   %s "% (len(old_subs_id_list), subs_file_name))                                     
-      new_all_fans_id_dict = {}
-      self.getnewsubfromallsubs( subs_id_list_in_file, new_all_sub_id_dict) 
-      
-  #从 old_subs_id_list 获取fans ，再获取fans的所有sub ,store to    new_all_sub_id_dict  
-  def getnewsubfromallsubs(self, old_subs_id_list, new_all_sub_id_dict):          
+       
+  def getnewsubfromallsubs(self):   
+       #get all subs' ids from file
+       old_subs_id_list = self.get_id_list_from_file(subs_file_name)
+       print("get %s subs id from the file named   %s "% (len(old_subs_id_list), subs_file_name))                                     
+       
        #get every fan's fans list        
        new_all_fans_id_dict = {}
        self.get_all_fans( old_subs_id_list, new_all_fans_id_dict)   
-       print("scrapy get %s fans from the list contained %s subs "% (len(new_all_fans_id_dict), len(old_subs_id_list)))
-       
-       new_all_fans_id_list = new_all_fans_id_dict.keys()       
+       print("scrapy get %s fans from the subs get from the file named %s "% (len(new_all_fans_id_dict), subs_file_name))
+       new_all_fans_id_list = new_all_fans_id_dict.keys()
+       new_all_sub_id_dict = {}
        self.get_all_subs( new_all_fans_id_list, new_all_sub_id_dict)   
        all_sub_id_counter = len(new_all_sub_id_dict)
        print("scrapy found %s subs from the fans get from the file named %s "% (all_sub_id_counter, subs_file_name))
-       
        #compare to get new sub id and record      
        sub_id_dict_compared = self.get_new_sub_dict_compared_file(new_all_sub_id_dict, subs_file_name)
        new_sub_html_name = "new_sub.htm"  
-       self.write_sub_info(sub_id_dict_compared, new_sub_html_name , 'a+' ) 
+       self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
        #record new sub id
        self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)      
-       self.write_TopN_sub_id(new_all_sub_id_dict, topn_sub_file_name)     
            
  
     
@@ -574,24 +570,12 @@ tudou_sns = SNS(tudou_f_s, tudou_s_f, tudou_s)
 
 
 tudou_sns.read_arg() 
-
-new_all_sub_id_dict = {}
-dig_sub_id_list = focus_sub_id_list
-last_dig_sub_id_list = []
-for i in range(deep_level): #loop from 0 to  deep_level - 1
-    tudou_sns.getnewsubfromallsubs(dig_sub_id_list,  new_all_sub_id_dict)
-    last_dig_sub_id_list = last_dig_sub_id_list + dig_sub_id_list  # id has digged
-    dig_sub_id_list = list(set(new_all_sub_id_dict.keys()) - set(last_dig_sub_id_list)) # clean id  which has digged   
-    
-
-'''
 idx = 1
 for each_focus_sub_id in focus_sub_id_list:
    print("################### deal No.%s  id %s. total %s id ##################" 
          % ( idx, each_focus_sub_id, len(focus_sub_id_list)))
    idx = idx + 1 
    tudou_sns.deep_dig_sub(each_focus_sub_id)
-'''   
 #tudou_sns.getnewsubfromallfans()
 #tudou_sns.getnewsubfromallsubs() #very slow!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
