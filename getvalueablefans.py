@@ -107,10 +107,11 @@ def get_tudou_json(_url):
 def store_to_dict(result_list, id_dict):
      
     for each_id in result_list:
+      str_id = str(each_id)
       id_focus_number = 1
-      if id_dict.has_key(each_id):
-         id_focus_number = id_dict[each_id] + 1                
-      id_dict[each_id] = id_focus_number    
+      if id_dict.has_key(str_id):
+         id_focus_number = id_dict[str_id] + 1                
+      id_dict[str_id] = id_focus_number    
     
     return 
       
@@ -204,10 +205,11 @@ class SNS ():
       
   def store_id_to_dict(self, id_list, id_dict):
     for each_id in id_list:
+      str_id = str(each_id)
       id_focus_number = 1
-      if id_dict.has_key(each_id):
-         id_focus_number = id_dict[each_id] + 1                
-      id_dict[each_id] = id_focus_number    
+      if id_dict.has_key(str_id):
+         id_focus_number = id_dict[str_id] + 1                
+      id_dict[str_id] = id_focus_number    
   
   def store_id_to_list(self, id_list, all_id_list):
     all_id_list = all_id_list + id_list
@@ -310,7 +312,7 @@ class SNS ():
              store_to_dict, fan_id_dict)     
       
   #add one fan's all subscribed user ids and relative focus value to sub_id_dict (global varible)
-  def get_subs(self, fan_id, sub_id_dict):        
+  def get_subs(self, fan_id, sub_id_dict):   #error runing! get nothing! need fix!     
         fan_sub_url =  self.get_fan_sub_first_url(fan_id)
         resp = func.GetHttpContent("GET", fan_sub_url )           
         if resp is None :
@@ -488,19 +490,20 @@ class SNS ():
     
     self.write_unique_idlist_to_file(sub_id_dict.keys(), subs_file_name)
     self.write_TopN_sub_id(sub_id_dict, topn_sub_file_name)     
-
-  def getnewsubfromallfans(self):
+    
+  def getnewsubfromfansfile(self, new_all_sub_id_dict):
        #read all fans' ids from file
        all_fans_id_list = self.get_id_list_from_file(fans_file_name)
        print("get %s fans id from the file named   %s "% (len(all_fans_id_list), fans_file_name))                              
-       
+       self.getnewsubfromallfans(all_fans_id_list, new_all_sub_id_dict)
+
+  def getnewsubfromallfans(self, all_fans_id_list, new_all_sub_id_dict):
        #get every fan's sub list        
-       new_all_sub_id_dict = {}
        self.get_all_subs( all_fans_id_list, new_all_sub_id_dict)   
        print("scrapy get %s subs from the fans get from the file named  %s "% (len(new_all_sub_id_dict), fans_file_name))
        
        sub_id_dict_compared = self.get_new_sub_dict_compared_file(new_all_sub_id_dict, subs_file_name)
-       new_sub_html_name = "new_sub.htm"  
+       new_sub_html_name = "new_sub_from_f.htm"  
        self.write_sub_info(sub_id_dict_compared, new_sub_html_name ) 
        #record new sub id
        self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)
@@ -519,14 +522,13 @@ class SNS ():
        print("scrapy get %s fans from the list contained %s subs "% (len(new_all_fans_id_dict), len(old_subs_id_list)))
        
        new_all_fans_id_list = new_all_fans_id_dict.keys()       
-       self.write_unique_idlist_to_file(new_all_fans_id_list, fans_file_name)
        self.get_all_subs( new_all_fans_id_list, new_all_sub_id_dict)   
        all_sub_id_counter = len(new_all_sub_id_dict)
        print("scrapy found %s subs from the fans get from the file named %s "% (all_sub_id_counter, subs_file_name))
        
        #compare to get new sub id and record      
        sub_id_dict_compared = self.get_new_sub_dict_compared_file(new_all_sub_id_dict, subs_file_name)
-       new_sub_html_name = "new_sub.htm"  
+       new_sub_html_name = "new_sub_from_s.htm"  
        self.write_sub_info(sub_id_dict_compared, new_sub_html_name , 'a+' ) 
        #record new sub id
        self.write_unique_idlist_to_file(sub_id_dict_compared.keys(), subs_file_name)      
@@ -576,14 +578,52 @@ tudou_sns = SNS(tudou_f_s, tudou_s_f, tudou_s)
 
 tudou_sns.read_arg() 
 
-new_all_sub_id_dict = {}
-dig_sub_id_list = focus_sub_id_list
-last_dig_sub_id_list = []
-for i in range(deep_level): #loop from 0 to  deep_level - 1
-    tudou_sns.getnewsubfromallsubs(dig_sub_id_list,  new_all_sub_id_dict)
-    last_dig_sub_id_list = last_dig_sub_id_list + dig_sub_id_list  # id has digged
-    dig_sub_id_list = list(set(new_all_sub_id_dict.keys()) - set(last_dig_sub_id_list)) # clean id  which has digged   
+focus_fans_id_list = tudou_sns.get_id_list_from_file(fans_file_name)
+
+print("I get %s fan id from file named %s  !" % (len(focus_fans_id_list) , fans_file_name))  
+topn_sub_id_set = set(tudou_sns.get_id_list_from_file(topn_sub_file_name)[:TOP_N])
+print("I get %s topn sub id from file named %s  !" % (len(topn_sub_id_set) , topn_sub_file_name))  
+
+
+fan_values_dict = {}
+for fan_id in focus_fans_id_list: #loop from 0 to  deep_level - 1
+    fan_get_sub_id_dict = {}
+    tudou_sns.get_all_subs([fan_id],  fan_get_sub_id_dict)   
+    fan_get_sub_id_set = set(fan_get_sub_id_dict.keys())    
+    fan_values_dict[fan_id] =  len(fan_get_sub_id_set & topn_sub_id_set) #get value
     
+fan_values_pair_list_sorted = sorted(fan_values_dict.items(), lambda x, y: cmp(x[1], y[1]), reverse=True)        
+  
+valuable_fan_id_list = []
+for pair in fan_values_pair_list_sorted:
+     fan_id = pair [0]
+     valuable_fan_id_list.append(fan_id)
+
+new_sub_dict  = {}     
+tudou_sns.get_all_subs( valuable_fan_id_list, new_sub_dict)   
+print("scrapy get %s subs from the valuable fans   "% (len(new_sub_dict) ))
+
+#sub_id_dict_compared = tudou_sns.get_new_sub_dict_compared_file(new_sub_dict, subs_file_name)
+new_sub_html_name = "new_sub_from_valuefans.htm"  
+tudou_sns.write_sub_info(new_sub_dict, new_sub_html_name ) 
+#record new sub id
+tudou_sns.write_unique_idlist_to_file(new_sub_dict.keys(), subs_file_name)
+     
+
+   	
+''' 
+fp = open('valuesub.htm','w')         
+for pair in fan_values_pair_list_sorted:
+     fan_id = pair [0]
+     fan_sub_url = 'http://www.tudou.com/home/_'+str(fan_id)+'/usersub?type=0'
+     value = pair[1]     
+     #print fan_id ,value
+     fp.write('<a href = "' +fan_sub_url +  '" target="_blank">' + 
+                      (str(fan_id.encode("GBK", 'ignore'))) +' </a>  ' + str(value))
+     fp.write('<br>')
+fp.close()   
+print("%s fan id and value writed  !" % (len(fan_values_pair_list_sorted) ))   
+'''
 
 '''
 idx = 1
